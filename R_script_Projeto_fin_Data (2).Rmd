@@ -1,0 +1,1108 @@
+```{r}
+library("readxl")
+library("stringr")
+library("dplyr")
+library("tidyverse")
+library("ggthemes")
+library("ggplot2")
+library("scales")
+```
+
+## Classificação CNAE
+
+```{r}
+
+valor_rais <- read_xlsx("C:/Users/zujv1/OneDrive/Insper/Insper Data/ProjetoFin/valor_rais.xlsx")
+View(valor_rais)
+
+cnae1.0 <- read_xlsx("C:/Users/zujv1/OneDrive/Insper/Insper Data/ProjetoFin//CNAE1.0.xlsx", skip = 1)
+
+valor_rais1 <- valor_rais %>% 
+  select(cnpj_cei,cnae95_classe,year,quarter,grossrev,ipca,n_i) %>% 
+  filter(!is.na(cnpj_cei)) %>% 
+  filter(!is.na(cnae95_classe)) %>% 
+  mutate_all(as.character)
+
+cnae1.0 <- cnae1.0 %>% 
+  select(SEÇÃO,CLASSE,DENOMINAÇÃO) %>%
+  filter(!is.na(CLASSE)) %>% 
+  mutate_all(as.character)
+
+gsub_cnae <- gsub("[.-]","",cnae1.0$CLASSE)
+
+cnae1.0 <- cnae1.0 %>%
+  mutate(CLASSE = gsub_cnae) %>% 
+  rename(., CNAE = CLASSE) %>% 
+  rename(., CLASSE = DENOMINAÇÃO )
+
+valor_rais2 <- rename(valor_rais1, CNAE = cnae95_classe)
+
+
+
+Denominacao_secao <- valor_rais2 %>% 
+  left_join(cnae1.0, by = "CNAE") %>% 
+  select(cnpj_cei,SEÇÃO) %>% 
+  distinct()
+# tem 74 NAs acima
+
+```
+
+## layoff em anos com setor sem NA
+
+```{r}
+
+layoff_rais <- valor_rais %>% 
+  select(cnpj_cei,year,quarter,layoff_i) %>% 
+  pivot_wider(names_from = quarter, values_from = layoff_i) %>% 
+  mutate_all(~na_if(.,0)) %>% 
+  mutate(layoff = rowMeans(.[,4:6], na.rm = TRUE)) %>% 
+  select(cnpj_cei,year,layoff) %>% 
+  transform(cnpj_cei = as.character(cnpj_cei))
+
+layoff <- layoff_rais %>% 
+  left_join(Denominacao_secao, by = "cnpj_cei") %>% 
+  drop_na() %>% 
+  select(cnpj_cei,SEÇÃO,year,layoff)
+
+```
+
+## Separation em anos com setor sem NA
+
+```{r}
+
+separation_rais <- valor_rais %>% 
+  select(cnpj_cei,year,quarter,separation_all_i) %>% 
+  pivot_wider(names_from = quarter, values_from = separation_all_i) %>% 
+  mutate_all(~na_if(.,0)) %>% 
+  mutate(separation = rowMeans(.[,4:6], na.rm = TRUE)) %>% 
+  select(cnpj_cei,year,separation) %>% 
+  transform(cnpj_cei = as.character(cnpj_cei))
+
+separation <- separation_rais %>% 
+  left_join(Denominacao_secao, by = "cnpj_cei") %>% 
+  drop_na() %>% 
+  select(cnpj_cei,SEÇÃO,year,separation)
+
+```
+
+## quit em anos com setor sem NA
+
+```{r}
+
+quit_rais <- valor_rais %>% 
+  select(cnpj_cei,year,quarter,quit_i) %>% 
+  pivot_wider(names_from = quarter, values_from = quit_i) %>% 
+  mutate_all(~na_if(.,0)) %>% 
+  mutate(quit = rowMeans(.[,4:6], na.rm = TRUE)) %>% 
+  select(cnpj_cei,year,quit) %>% 
+  transform(cnpj_cei = as.character(cnpj_cei))
+
+quit <- quit_rais %>% 
+  left_join(Denominacao_secao, by = "cnpj_cei") %>% 
+  select(cnpj_cei,SEÇÃO,year,quit)
+
+```
+
+## Layoff Por setor
+
+```{r}
+layoff_setor <- layoff %>% 
+  transform(layoff = as.character(layoff)) %>% 
+  pivot_wider(names_from = SEÇÃO, values_from = layoff)
+
+#Falta letra A e B abaixo
+
+layoff_A <- layoff_setor %>% 
+  select(cnpj_cei,year,A) %>% 
+  filter(!is.na(A)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = A) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_A = rowMeans(.[,2:60], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_A)
+
+layoff_B <- layoff_setor %>% 
+  select(cnpj_cei,year,B) %>% 
+  filter(!is.na(B)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = B) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_B = rowMeans(.[,2:5], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_B)
+
+layoff_C <- layoff_setor %>% 
+  select(cnpj_cei,year,C) %>% 
+  filter(!is.na(C)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = C) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_C = rowMeans(.[,2:31], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_C)
+  
+layoff_D <- layoff_setor %>% 
+  select(cnpj_cei,year,D) %>% 
+  filter(!is.na(D)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = D) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_D = rowMeans(.[,2:1131], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_D)
+
+layoff_E <- layoff_setor %>% 
+  select(cnpj_cei,year,E) %>% 
+  filter(!is.na(E)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = E) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_E = rowMeans(.[,2:107], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_E)
+
+layoff_F <- layoff_setor %>% 
+  select(cnpj_cei,year,F) %>% 
+  filter(!is.na(F)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = F) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_F = rowMeans(.[,2:220], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_F)
+
+layoff_G <- layoff_setor %>% 
+  select(cnpj_cei,year,G) %>% 
+  filter(!is.na(G)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = G) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_G = rowMeans(.[,2:420], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_G)
+
+layoff_H <- layoff_setor %>% 
+  select(cnpj_cei,year,H) %>% 
+  filter(!is.na(H)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = H) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_H = rowMeans(.[,2:37], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_H)
+
+layoff_I <- layoff_setor %>% 
+  select(cnpj_cei,year,I) %>% 
+  filter(!is.na(I)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = I) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_I = rowMeans(.[,2:291], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_I)
+
+layoff_J <- layoff_setor %>% 
+  select(cnpj_cei,year,J) %>% 
+  filter(!is.na(J)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = J) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_J = rowMeans(.[,2:16], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_J)
+
+layoff_K <- layoff_setor %>% 
+  select(cnpj_cei,year,K) %>% 
+  filter(!is.na(K)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = K) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_K = rowMeans(.[,2:282], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_K)
+
+layoff_L <- layoff_setor %>% 
+  select(cnpj_cei,year,L) %>% 
+  filter(!is.na(L)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = L) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_L = rowMeans(.[,2:4], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_L)
+
+layoff_M <- layoff_setor %>% 
+  select(cnpj_cei,year,M) %>% 
+  filter(!is.na(M)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = M) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_M = rowMeans(.[,2:34], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_M)
+
+layoff_N <- layoff_setor %>% 
+  select(cnpj_cei,year,N) %>% 
+  filter(!is.na(N)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = N) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_N = rowMeans(.[,2:89], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_N)
+
+layoff_O <- layoff_setor %>% 
+  select(cnpj_cei,year,O) %>% 
+  filter(!is.na(O)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = O) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_O = rowMeans(.[,2:84], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_O)
+
+# Não tem CNPJ na Seção P
+
+layoff_Q <- layoff_setor %>% 
+  select(cnpj_cei,year,Q) %>% 
+  filter(!is.na(Q)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = Q) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(layoff_mean_CNPJ_Q = rowMeans(.[,2:3], na.rm = TRUE)) %>% 
+  select(year,layoff_mean_CNPJ_Q)
+
+# juntando tudo
+
+layoff_ano <- layoff_C %>% 
+  left_join(layoff_D, by = "year") %>% 
+  left_join(layoff_E, by = "year") %>% 
+  left_join(layoff_F, by = "year") %>% 
+  left_join(layoff_G, by = "year") %>% 
+  left_join(layoff_H, by = "year") %>% 
+  left_join(layoff_I, by = "year") %>% 
+  left_join(layoff_J, by = "year") %>% 
+  left_join(layoff_L, by = "year") %>% 
+  left_join(layoff_M, by = "year") %>% 
+  left_join(layoff_N, by = "year") %>% 
+  left_join(layoff_O, by = "year") %>% 
+  left_join(layoff_Q, by = "year")
+
+```
+
+```{r}
+##produtividade por trabalhador
+ #curto prazo assume que capital é fixo
+ #valor da producao, ideal seria receita de vendas(receita real) / numero de trabalhadores
+```
+
+## Separation por setor
+
+```{r}
+
+separation_setor <- separation %>% 
+  transform(separation = as.character(separation)) %>% 
+  pivot_wider(names_from = SEÇÃO, values_from = separation)
+
+#Por Setor
+
+separation_A <- separation_setor %>% 
+  select(cnpj_cei,year,A) %>% 
+  filter(!is.na(A)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = A) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_A = rowMeans(.[,2:60], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_A)
+
+separation_B <- separation_setor %>% 
+  select(cnpj_cei,year,B) %>% 
+  filter(!is.na(B)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = B) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_B = rowMeans(.[,2:5], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_B)
+
+separation_C <- separation_setor %>% 
+  select(cnpj_cei,year,C) %>% 
+  filter(!is.na(C)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = C) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_C = rowMeans(.[,2:33], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_C)
+
+separation_D <- separation_setor %>% 
+  select(cnpj_cei,year,D) %>% 
+  filter(!is.na(D)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = D) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_C = rowMeans(.[,2:1142], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_C)
+
+separation_E <- separation_setor %>% 
+  select(cnpj_cei,year,E) %>% 
+  filter(!is.na(E)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = E) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_C = rowMeans(.[,2:121], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_C)
+
+separation_F <- separation_setor %>% 
+  select(cnpj_cei,year,F) %>% 
+  filter(!is.na(F)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = F) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_F = rowMeans(.[,2:222], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_F)
+
+separation_G <- separation_setor %>% 
+  select(cnpj_cei,year,G) %>% 
+  filter(!is.na(G)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = G) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_G = rowMeans(.[,2:425], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_G)
+
+separation_H <- separation_setor %>% 
+  select(cnpj_cei,year,H) %>% 
+  filter(!is.na(H)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = H) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_H = rowMeans(.[,2:37], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_H)
+
+separation_I <- separation_setor %>% 
+  select(cnpj_cei,year,I) %>% 
+  filter(!is.na(I)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = I) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_I = rowMeans(.[,2:298], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_I)
+
+separation_J <- separation_setor %>% 
+  select(cnpj_cei,year,J) %>% 
+  filter(!is.na(J)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = J) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_J = rowMeans(.[,2:16], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_J)
+
+separation_K <- separation_setor %>% 
+  select(cnpj_cei,year,K) %>% 
+  filter(!is.na(K)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = K) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_K = rowMeans(.[,2:291], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_K)
+
+separation_L <- separation_setor %>% 
+  select(cnpj_cei,year,L) %>% 
+  filter(!is.na(L)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = L) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_L = rowMeans(.[,2:4], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_L)
+
+separation_M <- separation_setor %>% 
+  select(cnpj_cei,year,M) %>% 
+  filter(!is.na(M)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = M) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_M = rowMeans(.[,2:35], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_M)
+
+separation_N <- separation_setor %>% 
+  select(cnpj_cei,year,N) %>% 
+  filter(!is.na(N)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = N) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_N = rowMeans(.[,2:90], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_N)
+
+separation_O <- separation_setor %>% 
+  select(cnpj_cei,year,O) %>% 
+  filter(!is.na(O)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = O) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_O = rowMeans(.[,2:84], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_O)
+
+# Não tem CNPJ na Seção P
+
+separation_Q <- separation_setor %>% 
+  select(cnpj_cei,year,Q) %>% 
+  filter(!is.na(Q)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = Q)%>%
+  mutate_all(as.numeric) %>% 
+  mutate(separation_mean_CNPJ_Q = rowMeans(.[,2:3], na.rm = TRUE)) %>% 
+  select(year,separation_mean_CNPJ_Q)
+
+# juntando tudo
+
+separation_ano <- separation_C %>% 
+  left_join(separation_D, by = "year") %>% 
+  left_join(separation_E, by = "year") %>% 
+  left_join(separation_F, by = "year") %>% 
+  left_join(separation_G, by = "year") %>% 
+  left_join(separation_H, by = "year") %>% 
+  left_join(separation_I, by = "year") %>% 
+  left_join(separation_J, by = "year") %>% 
+  left_join(separation_L, by = "year") %>% 
+  left_join(separation_M, by = "year") %>% 
+  left_join(separation_N, by = "year") %>% 
+  left_join(separation_O, by = "year") %>% 
+  left_join(separation_Q, by = "year")
+
+```
+
+## Quit por setor
+
+```{r}
+
+quit_setor <- quit %>% 
+  transform(quit = as.character(quit)) %>% 
+  pivot_wider(names_from = SEÇÃO, values_from = quit)
+
+#Por Setor
+
+quit_A <- quit_setor %>% 
+  select(cnpj_cei,year,A) %>% 
+  filter(!is.na(A)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = A) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_A = rowMeans(.[,2:66], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_A)
+
+quit_B <- quit_setor %>% 
+  select(cnpj_cei,year,B) %>% 
+  filter(!is.na(B)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = B) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_B = rowMeans(.[,2:5], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_B)
+
+quit_C <- quit_setor %>% 
+  select(cnpj_cei,year,C) %>% 
+  filter(!is.na(C)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = C) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_C = rowMeans(.[,2:34], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_C)
+
+quit_D <- quit_setor %>% 
+  select(cnpj_cei,year,D) %>% 
+  filter(!is.na(D)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = D) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_D = rowMeans(.[,2:1172], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_D)
+
+quit_E <- quit_setor %>% 
+  select(cnpj_cei,year,E) %>% 
+  filter(!is.na(E)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = E) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_E = rowMeans(.[,2:143], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_E)
+
+quit_F <- quit_setor %>% 
+  select(cnpj_cei,year,F) %>% 
+  filter(!is.na(F)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = F) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_F = rowMeans(.[,2:231], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_F)
+
+quit_G <- quit_setor %>% 
+  select(cnpj_cei,year,G) %>% 
+  filter(!is.na(G)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = G) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_G = rowMeans(.[,2:445], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_G)
+
+quit_H <- quit_setor %>% 
+  select(cnpj_cei,year,H) %>% 
+  filter(!is.na(H)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = H) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_H = rowMeans(.[,2:39], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_H)
+
+quit_I <- quit_setor %>% 
+  select(cnpj_cei,year,I) %>% 
+  filter(!is.na(I)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = I) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_I = rowMeans(.[,2:309], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_I)
+
+quit_J <- quit_setor %>% 
+  select(cnpj_cei,year,J) %>% 
+  filter(!is.na(J)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = J) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_J = rowMeans(.[,2:24], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_J)
+
+quit_K <- quit_setor %>% 
+  select(cnpj_cei,year,K) %>% 
+  filter(!is.na(K)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = K) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_K = rowMeans(.[,2:321], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_K)
+
+quit_L <- quit_setor %>% 
+  select(cnpj_cei,year,L) %>% 
+  filter(!is.na(L)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = L) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_L = rowMeans(.[,2:4], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_L)
+
+quit_M <- quit_setor %>% 
+  select(cnpj_cei,year,M) %>% 
+  filter(!is.na(M)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = M) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_M = rowMeans(.[,2:35], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_M)
+
+quit_N <- quit_setor %>% 
+  select(cnpj_cei,year,N) %>% 
+  filter(!is.na(N)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = N) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_N = rowMeans(.[,2:91], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_N)
+
+quit_O <- quit_setor %>% 
+  select(cnpj_cei,year,O) %>% 
+  filter(!is.na(O)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = O) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_O = rowMeans(.[,2:87], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_O)
+
+# Não tem CNPJ na Seção P
+
+quit_Q <- quit_setor %>% 
+  select(cnpj_cei,year,Q) %>% 
+  filter(!is.na(Q)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = Q) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(quit_mean_CNPJ_Q = rowMeans(.[,2:3], na.rm = TRUE)) %>% 
+  select(year,quit_mean_CNPJ_Q)
+
+# juntando tudo
+
+quit_ano <- quit_C %>% 
+  left_join(quit_D, by = "year") %>% 
+  left_join(quit_E, by = "year") %>% 
+  left_join(quit_F, by = "year") %>% 
+  left_join(quit_G, by = "year") %>% 
+  left_join(quit_H, by = "year") %>% 
+  left_join(quit_I, by = "year") %>% 
+  left_join(quit_J, by = "year") %>% 
+  left_join(quit_L, by = "year") %>% 
+  left_join(quit_M, by = "year") %>% 
+  left_join(quit_N, by = "year") %>% 
+  left_join(quit_O, by = "year") %>% 
+  left_join(quit_Q, by = "year")
+
+```
+
+## Grossrev (Receita Bruta)
+
+```{r}
+
+grossrev_defla_rais <- valor_rais1 %>% 
+  select(cnpj_cei,year,quarter,grossrev,ipca,n_i) %>% 
+  mutate_all(as.numeric) %>% 
+  mutate(gross_defla = grossrev*(2773.08/ipca)) %>% 
+  select(cnpj_cei,year,quarter,gross_defla,n_i)
+
+grossrev_defla <- grossrev_defla_rais %>% 
+  select(cnpj_cei,year,quarter,gross_defla,n_i) %>% 
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_n = gross_defla/n_i) %>% 
+  select(cnpj_cei,year,quarter,grossrev_n) %>% 
+  pivot_wider(names_from = quarter, values_from = grossrev_n) %>% 
+  mutate(grossrev_n = rowMeans(.[,3:6], na.rm = TRUE)) %>% 
+  select(cnpj_cei,year,grossrev_n) %>% 
+  transform(cnpj_cei = as.character(cnpj_cei))
+
+grossrev <- grossrev_defla %>% 
+  left_join(Denominacao_secao, by = "cnpj_cei") %>% 
+  drop_na() %>% 
+  select(cnpj_cei,SEÇÃO,year,grossrev_n)
+
+grossrev_setor <- grossrev %>% 
+  transform(grossrev = as.character(grossrev_n)) %>% 
+  pivot_wider(names_from = SEÇÃO, values_from = grossrev)
+
+grossrev_2017 <- grossrev_defla %>% 
+  filter(year == 2017) %>%
+  select(cnpj_cei,grossrev_n)
+
+#Por setor
+
+grossrev_A <- grossrev_setor %>% 
+  select(cnpj_cei,year,A) %>% 
+  filter(!is.na(A)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = A) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_A = rowMeans(.[,2:66], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_A)
+
+grossrev_B <- grossrev_setor %>% 
+  select(cnpj_cei,year,B) %>% 
+  filter(!is.na(B)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = B) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_B = rowMeans(.[,2:5], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_B)
+
+grossrev_C <- grossrev_setor %>% 
+  select(cnpj_cei,year,C) %>% 
+  filter(!is.na(C)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = C) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_C = rowMeans(.[,2:33], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_C)
+
+grossrev_D <- grossrev_setor %>% 
+  select(cnpj_cei,year,D) %>% 
+  filter(!is.na(D)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = D) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_D = rowMeans(.[,2:1152], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_D)
+
+grossrev_E <- grossrev_setor %>% 
+  select(cnpj_cei,year,E) %>% 
+  filter(!is.na(E)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = E) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_E = rowMeans(.[,2:140], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_E)
+
+grossrev_F <- grossrev_setor %>% 
+  select(cnpj_cei,year,F) %>% 
+  filter(!is.na(F)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = F) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_F = rowMeans(.[,2:226], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_F)
+
+grossrev_G <- grossrev_setor %>% 
+  select(cnpj_cei,year,G) %>% 
+  filter(!is.na(G)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = G) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_G = rowMeans(.[,2:434], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_G)
+
+grossrev_H <- grossrev_setor %>% 
+  select(cnpj_cei,year,H) %>% 
+  filter(!is.na(H)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = H) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_H = rowMeans(.[,2:37], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_H)
+
+grossrev_I <- grossrev_setor %>% 
+  select(cnpj_cei,year,I) %>% 
+  filter(!is.na(I)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = I) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_I = rowMeans(.[,2:303], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_I)
+
+grossrev_J <- grossrev_setor %>% 
+  select(cnpj_cei,year,J) %>% 
+  filter(!is.na(J)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = J) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_J = rowMeans(.[,2:23], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_J)
+
+grossrev_K <- grossrev_setor %>% 
+  select(cnpj_cei,year,K) %>% 
+  filter(!is.na(K)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = K) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_K = rowMeans(.[,2:306], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_K)
+
+grossrev_L <- grossrev_setor %>% 
+  select(cnpj_cei,year,L) %>% 
+  filter(!is.na(L)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = L) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_L = rowMeans(.[,2:4], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_L)
+
+grossrev_M <- grossrev_setor %>% 
+  select(cnpj_cei,year,M) %>% 
+  filter(!is.na(M)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = M) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_M = rowMeans(.[,2:35], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_M)
+
+grossrev_N <- grossrev_setor %>% 
+  select(cnpj_cei,year,N) %>% 
+  filter(!is.na(N)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = N) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_N = rowMeans(.[,2:90], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_N)
+
+grossrev_O <- grossrev_setor %>% 
+  select(cnpj_cei,year,O) %>% 
+  filter(!is.na(O)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = O) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_O = rowMeans(.[,2:86], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_O)
+
+# Não tem CNPJ na Seção P, deve ter pro grossrev, mas por enquanto deixa pra la 
+
+grossrev_Q <- grossrev_setor %>% 
+  select(cnpj_cei,year,Q) %>% 
+  filter(!is.na(Q)) %>% 
+  pivot_wider(names_from = cnpj_cei, values_from = Q) %>%
+  mutate_all(as.numeric) %>% 
+  mutate(grossrev_mean_CNPJ_Q = rowMeans(.[,2:3], na.rm = TRUE)) %>% 
+  select(year,grossrev_mean_CNPJ_Q)
+
+# juntando tudo
+
+grossrev_ano <- grossrev_C %>% 
+  left_join(grossrev_D, by = "year") %>% 
+  left_join(grossrev_E, by = "year") %>% 
+  left_join(grossrev_F, by = "year") %>% 
+  left_join(grossrev_G, by = "year") %>% 
+  left_join(grossrev_H, by = "year") %>% 
+  left_join(grossrev_I, by = "year") %>% 
+  left_join(grossrev_J, by = "year") %>% 
+  left_join(grossrev_L, by = "year") %>% 
+  left_join(grossrev_M, by = "year") %>% 
+  left_join(grossrev_N, by = "year") %>% 
+  left_join(grossrev_O, by = "year") %>% 
+  left_join(grossrev_Q, by = "year")
+
+```
+
+# Layoff por grossrev por ano médio dos CNPJ
+
+```{r}
+
+Lay_Rev_A <- layoff_A %>% 
+  left_join(grossrev_A, by = "year")
+
+Lay_Rev_B <- layoff_B %>% 
+  left_join(grossrev_B, by = "year")
+
+Lay_Rev_C <- layoff_C %>% 
+  left_join(grossrev_C, by = "year")
+
+Lay_Rev_D <- layoff_D %>% 
+  left_join(grossrev_D, by = "year")
+
+Lay_Rev_E <- layoff_E %>% 
+  left_join(grossrev_E, by = "year")
+
+Lay_Rev_F <- layoff_F %>% 
+  left_join(grossrev_F, by = "year")
+
+Lay_Rev_G <- layoff_G %>% 
+  left_join(grossrev_G, by = "year")
+
+Lay_Rev_H <- layoff_H %>% 
+  left_join(grossrev_H, by = "year")
+
+Lay_Rev_I <- layoff_I %>% 
+  left_join(grossrev_I, by = "year")
+
+Lay_Rev_J <- layoff_J %>% 
+  left_join(grossrev_K, by = "year")
+
+Lay_Rev_K <- layoff_K %>% 
+  left_join(grossrev_K, by = "year")
+
+Lay_Rev_L <- layoff_L %>% 
+  left_join(grossrev_L, by = "year")
+
+Lay_Rev_M <- layoff_M %>% 
+  left_join(grossrev_M, by = "year")
+
+Lay_Rev_N <- layoff_N %>% 
+  left_join(grossrev_N, by = "year")
+
+Lay_Rev_O <- layoff_O %>% 
+  left_join(grossrev_O, by = "year")
+
+Lay_Rev_Q <- layoff_Q %>% 
+  left_join(grossrev_Q, by = "year")
+
+```
+
+# Separation por grossrev por ano médio dos CNPJ
+
+```{r}
+
+Sep_Rev_A <- separation_A %>% 
+  left_join(grossrev_A, by = "year")
+
+Sep_Rev_B <- separation_B %>% 
+  left_join(grossrev_B, by = "year")
+
+Sep_Rev_C <- separation_C %>% 
+  left_join(grossrev_C, by = "year")
+
+Sep_Rev_D <- separation_D %>% 
+  left_join(grossrev_D, by = "year")
+
+Sep_Rev_E <- separation_E %>% 
+  left_join(grossrev_E, by = "year")
+
+Sep_Rev_F <- separation_F %>% 
+  left_join(grossrev_F, by = "year")
+
+Sep_Rev_G <- separation_G %>% 
+  left_join(grossrev_G, by = "year")
+
+Sep_Rev_H <- separation_H %>% 
+  left_join(grossrev_H, by = "year")
+
+Sep_Rev_I <- separation_I %>% 
+  left_join(grossrev_I, by = "year")
+
+Sep_Rev_J <- separation_J %>% 
+  left_join(grossrev_K, by = "year")
+
+Sep_Rev_K <- separation_K %>% 
+  left_join(grossrev_K, by = "year")
+
+Sep_Rev_L <- separation_L %>% 
+  left_join(grossrev_L, by = "year")
+
+Sep_Rev_M <- separation_M %>% 
+  left_join(grossrev_M, by = "year")
+
+Sep_Rev_N <- separation_N %>% 
+  left_join(grossrev_N, by = "year")
+
+Sep_Rev_O <- separation_O %>% 
+  left_join(grossrev_O, by = "year")
+
+Sep_Rev_Q <- separation_Q %>% 
+  left_join(grossrev_Q, by = "year")
+
+Sep_Rev_tudo <- Sep_Rev_A %>% 
+  left_join(Sep_Rev_B, by = "year") %>% 
+  left_join(Sep_Rev_C, by = "year") %>% 
+  left_join(Sep_Rev_D, by = "year") %>% 
+  left_join(Sep_Rev_E, by = "year") %>% 
+  left_join(Sep_Rev_F, by = "year") %>% 
+  left_join(Sep_Rev_G, by = "year") %>% 
+  left_join(Sep_Rev_H, by = "year") %>% 
+  left_join(Sep_Rev_I, by = "year") %>% 
+  left_join(Sep_Rev_J, by = "year") %>% 
+  left_join(Sep_Rev_K, by = "year") %>% 
+  left_join(Sep_Rev_L, by = "year") %>% 
+  left_join(Sep_Rev_M, by = "year") %>% 
+  left_join(Sep_Rev_N, by = "year") %>% 
+  left_join(Sep_Rev_O, by = "year") %>% 
+  left_join(Sep_Rev_Q, by = "year")
+
+```
+
+# Separation por grossrev por ano médio dos CNPJ
+
+```{r}
+
+Quit_Rev_A <- quit_A %>% 
+  left_join(grossrev_A, by = "year")
+
+Quit_Rev_B <- quit_B %>% 
+  left_join(grossrev_B, by = "year")
+
+Quit_Rev_C <- quit_C %>% 
+  left_join(grossrev_C, by = "year")
+
+Quit_Rev_D <- quit_D %>% 
+  left_join(grossrev_D, by = "year")
+
+Quit_Rev_E <- quit_E %>% 
+  left_join(grossrev_E, by = "year")
+
+Quit_Rev_F <- quit_F %>% 
+  left_join(grossrev_F, by = "year")
+
+Quit_Rev_G <- quit_G %>% 
+  left_join(grossrev_G, by = "year")
+
+Quit_Rev_H <- quit_H %>% 
+  left_join(grossrev_H, by = "year")
+
+Quit_Rev_I <- quit_I %>% 
+  left_join(grossrev_I, by = "year")
+
+Quit_Rev_J <- quit_J %>% 
+  left_join(grossrev_K, by = "year")
+
+Quit_Rev_K <- quit_K %>% 
+  left_join(grossrev_K, by = "year")
+
+Quit_Rev_L <- quit_L %>% 
+  left_join(grossrev_L, by = "year")
+
+Quit_Rev_M <- quit_M %>% 
+  left_join(grossrev_M, by = "year")
+
+Quit_Rev_N <- quit_N %>% 
+  left_join(grossrev_N, by = "year")
+
+Quit_Rev_O <- quit_O %>% 
+  left_join(grossrev_O, by = "year")
+
+Quit_Rev_Q <- quit_Q %>% 
+  left_join(grossrev_Q, by = "year")
+
+```
+
+# Desinflacionar Grossrev
+
+```{r}
+
+wage_inc_defla <- valor_rais %>% 
+  select(cnpj_cei,year,quarter,separation_all_i,ipca,wage_incumbents) %>% 
+  mutate_all(as.numeric) %>% 
+  mutate(wage_inc_defla = wage_incumbents*(2773.08/ipca)) %>% 
+  select(cnpj_cei,year,quarter,wage_inc_defla,separation_all_i)
+
+wage_inc_anualizado <- wage_inc_defla %>% 
+  mutate_all(as.numeric) %>% 
+  select(cnpj_cei,year,quarter,separation_all_i,wage_inc_defla) %>% 
+  pivot_wider(names_from = quarter, values_from = wage_inc_defla) %>% 
+  mutate(wage_year = rowMeans(.[,3:6], na.rm = TRUE)) %>% 
+  select(cnpj_cei,year,wage_year,separation_all_i) %>% 
+  transform(cnpj_cei = as.character(cnpj_cei))
+
+wage_inc_zu <- wage_inc_anualizado %>% 
+  select(cnpj_cei,year,separation_all_i,wage_year) %>% 
+  filter(year == 2017)
+
+#2008
+grossrev_2008 <- grossrev_defla %>% 
+  filter(year == 2008) %>%
+  select(cnpj_cei,grossrev_n)
+
+wage_inc_2008 <- wage_inc_anualizado %>% 
+  filter(year == 2008) %>% 
+  select(cnpj_cei,wage_year)
+
+wage_rev_2008 <- grossrev_2008 %>% 
+  left_join(wage_inc_2008, by = "cnpj_cei")
+
+
+## 2017
+Agriculture_sep_2017 <- separation %>% 
+  filter(SEÇÃO == "A" | SEÇÃO == "B") %>% 
+  filter(year == "2017") %>% 
+  left_join(grossrev_2017, by = "cnpj_cei")
+View(Agriculture_sep_2017)
+
+Minning_sep_2017 <- separation %>% 
+  filter(SEÇÃO == "C") %>% 
+  filter(year == "2017") %>% 
+  left_join(grossrev_2017, by = "cnpj_cei")
+View(Minning_sep_2017)
+
+Manufactoring_sep_2017 <- separation %>% 
+  filter(SEÇÃO == "D") %>% 
+  filter(year == "2017") %>% 
+  left_join(grossrev_2017, by = "cnpj_cei")
+View(Manufactoring_sep_2017)
+
+Utilities_sep_2017 <- separation %>% 
+  filter(SEÇÃO == "E") %>% 
+  filter(year == "2017") %>% 
+  left_join(grossrev_2017, by = "cnpj_cei")
+View(Utilities_sep_2017)
+
+Construction_sep_2017 <- separation %>% 
+  filter(SEÇÃO == "F") %>% 
+  filter(year == "2017") %>% 
+  left_join(grossrev_2017, by = "cnpj_cei")
+View(Construction_sep_2017)
+
+Retail_sep_2017 <- separation %>% 
+  filter(SEÇÃO == "G") %>% 
+  filter(year == "2017") %>% 
+  left_join(grossrev_2017, by = "cnpj_cei")
+View(Retail_sep_2017)
+
+Services_sep_2017 <- separation %>% 
+  filter(SEÇÃO == "H" | SEÇÃO == "I" | SEÇÃO == "J" | SEÇÃO == "K" | SEÇÃO == "L" | SEÇÃO == "M" | SEÇÃO == "N" | SEÇÃO == "O" | SEÇÃO == "Q") %>% 
+  filter(year == "2017") %>% 
+  left_join(grossrev_2017, by = "cnpj_cei")
+View(Services_sep_2017)
+
+
+sep_zu <- separation_rais %>% 
+  filter(year == 2017) %>%
+  select(cnpj_cei,separation)
+
+grossrev_zuu <- grossrev_defla %>% 
+  filter(year == 2017) %>%
+  select(cnpj_cei,grossrev_n) %>% 
+  left_join(sep_zu, by = "cnpj_cei")
+
+ggplot(data = grossrev_zuu) +
+  geom_point(mapping = aes(x = separation, y = grossrev_n,
+                           color = "red")) +
+  scale_x_log10()
+
+ggplot(data = grossrev_zuu) +
+  geom_point(mapping = aes(x = grossrev_n, y = separation,
+                           color = "red")) +
+  scale_x_log10()
+
+
+ggplot(data = grossrev_zuu) +
+  geom_point(mapping = aes(x = grossrev_n, y = separation), colour = "blue") +
+  xlim(0,10000) +
+  labs(x = "Produtividade por Trabalhador", y = "Churn", title = "Relação entre o churn e produtividade por trabalhador")
+  scale_x_log10()
+  
+ggplot(data = wage_inc_zu) +
+  geom_point(mapping = aes(x = wage_year, y = separation_all_i), colour = "blue") +
+  xlim(200,1300)+
+  labs(x = "Salário Anual Real", y = "Churn", title = "Relação entre o churn e salário real anual")
+  scale_x_log10()
+
+  
+ggplot(data = Agriculture_sep_2017) +
+  geom_point(mapping = aes(x = grossrev_n, y = separation), colour = "blue") +
+  xlim(0,7500) +
+  ylim(0,1) +
+  labs(x = "Produtividade por Trabalhador", y = "Churn", title = "Relação entre o churn e produtividade por trabalhador (Agricultura)")
+  scale_x_log10()  
+  
+ggplot(data = Minning_sep_2017) +
+  geom_point(mapping = aes(x = grossrev_n, y = separation), colour = "blue") +
+  xlim(0,7500) +
+  ylim(0,1) +
+  labs(x = "Produtividade por Trabalhador", y = "Churn", title = "Relação entre o churn e produtividade por trabalhador (Mineração)")
+  scale_x_log10()  
+  
+ggplot(data = Manufactoring_sep_2017) +
+  geom_point(mapping = aes(x = grossrev_n, y = separation), colour = "blue") +
+  xlim(0,7500) +
+  ylim(0,1) +
+  labs(x = "Produtividade por Trabalhador", y = "Churn", title = "Relação entre o churn e produtividade por trabalhador (Industria)")
+  scale_x_log10()
+  
+ggplot(data = Utilities_sep_2017) +
+  geom_point(mapping = aes(x = grossrev_n, y = separation), colour = "blue") +
+  xlim(0,7500) +
+  ylim(0,1) +
+  labs(x = "Produtividade por Trabalhador", y = "Churn", title = "Relação entre o churn e produtividade por trabalhador (Utilidades)")
+  scale_x_log10()
+  
+ggplot(data = Construction_sep_2017) +
+  geom_point(mapping = aes(x = grossrev_n, y = separation), colour = "blue") +
+  xlim(0,7500) +
+  ylim(0,1) +
+  labs(x = "Produtividade por Trabalhador", y = "Churn", title = "Relação entre o churn e produtividade por trabalhador (Construção)")
+  scale_x_log10()
+  
+ggplot(data = Retail_sep_2017) +
+  geom_point(mapping = aes(x = grossrev_n, y = separation), colour = "blue") +
+  xlim(0,7500) +
+  ylim(0,1) +
+  labs(x = "Produtividade por Trabalhador", y = "Churn", title = "Relação entre o churn e produtividade por trabalhador (Varejo)")
+  scale_x_log10()
+  
+ggplot(data = Services_sep_2017) +
+  geom_point(mapping = aes(x = grossrev_n, y = separation), colour = "blue") +
+  xlim(0,7500) +
+  ylim(0,1) +
+  labs(x = "Produtividade por Trabalhador", y = "Churn", title = "Relação entre o churn e produtividade por trabalhador (Serviços)")
+  scale_x_log10()
+  
+```
